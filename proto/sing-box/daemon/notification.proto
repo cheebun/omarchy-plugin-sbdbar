@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package daemon;
+option go_package = "github.com/sagernet/sing-box/daemon";
+
+message NotificationEvent {
+  oneof event {
+    Notification send = 1;
+    NotificationCancel cancel = 2;
+  }
+}
+
+message Notification {
+  string identifier = 1;
+  string typeName = 2;
+  int32 typeID = 3;
+  string title = 4;
+  string subtitle = 5;
+  string body = 6;
+  string openURL = 7;
+}
+
+message NotificationCancel {
+  string identifier = 1;
+  int32 typeID = 2;
+}

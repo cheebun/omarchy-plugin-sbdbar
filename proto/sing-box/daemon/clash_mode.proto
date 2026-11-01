@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package daemon;
+option go_package = "github.com/sagernet/sing-box/daemon";
+
+message ClashMode {
+  string mode = 3;
+}
+
+message ClashModeStatus {
+  repeated string modeList = 1;
+  string currentMode = 2;
+}

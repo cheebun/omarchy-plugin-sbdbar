@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package daemon;
+option go_package = "github.com/sagernet/sing-box/daemon";
+
+enum LogLevel {
+  PANIC = 0;
+  FATAL = 1;
+  ERROR = 2;
+  WARN = 3;
+  INFO = 4;
+  DEBUG = 5;
+  TRACE = 6;
+}
+
+message Log {
+  repeated Message messages = 1;
+  bool reset = 2;
+  message Message {
+    LogLevel level = 1;
+    string message = 2;
+  }
+}
+
+message DefaultLogLevel {
+  LogLevel level = 1;
+}

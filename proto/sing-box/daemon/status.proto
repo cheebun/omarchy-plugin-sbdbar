@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package daemon;
+option go_package = "github.com/sagernet/sing-box/daemon";
+
+message Version {
+  string version = 1;
+  int32 apiVersion = 2;
+}
+
+message ServiceStatus {
+  enum Type {
+    IDLE = 0;
+    STARTING = 1;
+    STARTED = 2;
+    STOPPING = 3;
+    FATAL = 4;
+  }
+  Type status = 1;
+  string errorMessage = 2;
+}
+
+message SubscribeStatusRequest {
+  int64 interval = 1;
+}
+
+message Status {
+  uint64 memory = 1;
+  int32 goroutines = 2;
+  int32 connectionsIn = 3;
+  int32 connectionsOut = 4;
+  bool trafficAvailable = 5;
+  int64 uplink = 6;
+  int64 downlink = 7;
+  int64 uplinkTotal = 8;
+  int64 downlinkTotal = 9;
+}
+
+message DeprecatedWarnings {
+  repeated DeprecatedWarning warnings = 1;
+}
+
+message DeprecatedWarning {
+  string message = 1;
+  bool impending = 2;
+  string migrationLink = 3;
+  string description = 4;
+  string deprecatedVersion = 5;
+  string scheduledVersion = 6;
+}
+
+message StartedAt {
+  int64 startedAt = 1;
+}

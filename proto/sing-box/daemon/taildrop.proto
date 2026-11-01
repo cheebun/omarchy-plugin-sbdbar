@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package daemon;
+option go_package = "github.com/sagernet/sing-box/daemon";
+
+message SubscribeTaildropInboxRequest {
+  string endpointTag = 1;
+}
+
+message MarkTaildropInboxReadRequest {
+  string endpointTag = 1;
+}
+
+message TaildropInbox {
+  string endpointTag = 1;
+  repeated TaildropFile files = 2;
+  repeated TaildropReceivingFile receiving = 3;
+}
+
+message TaildropFile {
+  string name = 1;
+  int64 size = 2;
+  string senderName = 3;
+  int64 modifiedAt = 4;
+}
+
+message TaildropReceivingFile {
+  string name = 1;
+  int64 size = 2;
+  int64 receivedBytes = 3;
+  string senderID = 4;
+  string senderName = 5;
+}
+
+message TaildropSendClientMessage {
+  oneof message {
+    TaildropSendStart start = 1;
+    TaildropFileChunk chunk = 2;
+    TaildropFileDone fileDone = 3;
+  }
+}
+
+message TaildropSendStart {
+  string endpointTag = 1;
+  string peerStableID = 2;
+  repeated TaildropOutgoingFile files = 3;
+}
+
+message TaildropOutgoingFile {
+  string name = 1;
+  int64 size = 2;
+}
+
+message TaildropFileChunk {
+  bytes data = 1;
+}
+
+message TaildropFileDone {}
+
+message TaildropSendServerMessage {
+  oneof message {
+    TaildropSendProgress progress = 1;
+    int64 receivedBytes = 2;
+  }
+}
+
+message TaildropSendProgress {
+  int32 fileIndex = 1;
+  int64 sentBytes = 2;
+  bool fileCompleted = 3;
+}
+
+message DownloadTaildropFileRequest {
+  string endpointTag = 1;
+  string name = 2;
+}
+
+message DownloadTaildropFileChunk {
+  int64 size = 1;
+  bytes data = 2;
+}
+
+message DeleteTaildropFileRequest {
+  string endpointTag = 1;
+  string name = 2;
+}
+
+message CancelTaildropReceivingRequest {
+  string endpointTag = 1;
+  string senderID = 2;
+  string name = 3;
+}

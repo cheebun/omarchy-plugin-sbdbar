@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package daemon;
+option go_package = "github.com/sagernet/sing-box/daemon";
+
+import "google/protobuf/empty.proto";
+import "sing-box/daemon/status.proto";
+import "sing-box/daemon/log.proto";
+import "sing-box/daemon/outbound.proto";
+import "sing-box/daemon/clash_mode.proto";
+import "sing-box/daemon/connection.proto";
+import "sing-box/daemon/diagnostics.proto";
+import "sing-box/daemon/taildrop.proto";
+import "sing-box/daemon/tailscale.proto";
+import "sing-box/daemon/usb.proto";
+import "sing-box/daemon/openconnect.proto";
+import "sing-box/daemon/openvpn.proto";
+import "sing-box/daemon/notification.proto";
+
+service StartedService {
+  rpc GetVersion(google.protobuf.Empty) returns(Version) {}
+  rpc SubscribeServiceStatus(google.protobuf.Empty) returns(stream ServiceStatus) {}
+  rpc SubscribeLog(google.protobuf.Empty) returns(stream Log) {}
+  rpc GetDefaultLogLevel(google.protobuf.Empty) returns(DefaultLogLevel) {}
+  rpc ClearLogs(google.protobuf.Empty) returns(google.protobuf.Empty) {}
+  rpc SubscribeStatus(SubscribeStatusRequest) returns(stream Status) {}
+  rpc SubscribeGroups(google.protobuf.Empty) returns(stream Groups) {}
+
+  rpc GetClashModeStatus(google.protobuf.Empty) returns(ClashModeStatus) {}
+  rpc SubscribeClashMode(google.protobuf.Empty) returns(stream ClashMode) {}
+  rpc SetClashMode(ClashMode) returns(google.protobuf.Empty) {}
+
+  rpc URLTest(URLTestRequest) returns(google.protobuf.Empty) {}
+  rpc SelectOutbound(SelectOutboundRequest) returns (google.protobuf.Empty) {}
+  rpc SetGroupExpand(SetGroupExpandRequest) returns (google.protobuf.Empty) {}
+
+  rpc SubscribeConnections(SubscribeConnectionsRequest) returns(stream ConnectionEvents) {}
+  rpc CloseConnection(CloseConnectionRequest) returns(google.protobuf.Empty) {}
+  rpc CloseAllConnections(google.protobuf.Empty) returns(google.protobuf.Empty) {}
+  rpc GetDeprecatedWarnings(google.protobuf.Empty) returns(DeprecatedWarnings) {}
+  rpc GetStartedAt(google.protobuf.Empty) returns(StartedAt) {}
+
+  rpc SubscribeOutbounds(google.protobuf.Empty) returns (stream OutboundList) {}
+  rpc StartNetworkQualityTest(NetworkQualityTestRequest) returns (stream NetworkQualityTestProgress) {}
+  rpc StartSTUNTest(STUNTestRequest) returns (stream STUNTestProgress) {}
+  rpc SubscribeTailscaleStatus(google.protobuf.Empty) returns (stream TailscaleStatusUpdate) {}
+  rpc StartTailscalePing(TailscalePingRequest) returns (stream TailscalePingResponse) {}
+  rpc SetTailscaleExitNode(SetTailscaleExitNodeRequest) returns (google.protobuf.Empty) {}
+  rpc TailscaleLogout(TailscaleLogoutRequest) returns (google.protobuf.Empty) {}
+  rpc StartTailscaleSSHSession(stream TailscaleSSHClientMessage) returns (stream TailscaleSSHServerMessage) {}
+  rpc SubscribeTaildropInbox(SubscribeTaildropInboxRequest) returns (stream TaildropInbox) {}
+  rpc MarkTaildropInboxRead(MarkTaildropInboxReadRequest) returns (google.protobuf.Empty) {}
+  rpc SendTaildropFiles(stream TaildropSendClientMessage) returns (stream TaildropSendServerMessage) {}
+  rpc DownloadTaildropFile(DownloadTaildropFileRequest) returns (stream DownloadTaildropFileChunk) {}
+  rpc DeleteTaildropFile(DeleteTaildropFileRequest) returns (google.protobuf.Empty) {}
+  rpc CancelTaildropReceiving(CancelTaildropReceivingRequest) returns (google.protobuf.Empty) {}
+  rpc ProvideUSBDevices(stream USBProviderMessage) returns (stream USBServerMessage) {}
+  rpc SubscribeUSBIPServerStatus(google.protobuf.Empty) returns (stream USBIPServerStatusUpdate) {}
+  rpc SubscribeOpenConnectStatus(google.protobuf.Empty) returns (stream OpenConnectStatusUpdate) {}
+  rpc SubmitOpenConnectAuthResponse(OpenConnectAuthResponseSubmission) returns (google.protobuf.Empty) {}
+  rpc CancelOpenConnectAuthChallenge(OpenConnectAuthChallengeCancel) returns (google.protobuf.Empty) {}
+  rpc SubscribeOpenVPNStatus(google.protobuf.Empty) returns (stream OpenVPNStatusUpdate) {}
+  rpc SubmitOpenVPNChallengeResponse(OpenVPNChallengeSubmission) returns (google.protobuf.Empty) {}
+  rpc CancelOpenVPNChallenge(OpenVPNChallengeCancel) returns (google.protobuf.Empty) {}
+  rpc SubscribeNotifications(google.protobuf.Empty) returns (stream NotificationEvent) {}
+}

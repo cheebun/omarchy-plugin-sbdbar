@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package daemon;
+option go_package = "github.com/sagernet/sing-box/daemon";
+
+message OpenVPNStatusUpdate {
+  repeated OpenVPNEndpointStatus endpoints = 1;
+}
+
+message OpenVPNEndpointStatus {
+  string endpointTag = 1;
+  string state = 2;
+  string stateText = 3;
+  OpenVPNChallenge challenge = 4;
+  string error = 5;
+  OpenVPNTunnelInfo tunnelInfo = 6;
+}
+
+message OpenVPNTunnelInfo {
+  string server = 1;
+  reserved 2;
+  string network = 3;
+  repeated string ipv4 = 4;
+  repeated string ipv6 = 5;
+  repeated string dns = 6;
+  uint32 mtu = 7;
+  int64 connectedSince = 8;
+  string cipher = 9;
+}
+
+message OpenVPNChallenge {
+  string id = 1;
+  string kind = 2;
+  string username = 3;
+  string message = 4;
+  string url = 5;
+  string secretMessage = 6;
+  bool echo = 7;
+  string previousError = 8;
+  int64 deadline = 9;
+}
+
+message OpenVPNChallengeSubmission {
+  string endpointTag = 1;
+  string challengeID = 2;
+  string username = 3;
+  string password = 4;
+  string secret = 5;
+}
+
+message OpenVPNChallengeCancel {
+  string endpointTag = 1;
+  string challengeID = 2;
+}

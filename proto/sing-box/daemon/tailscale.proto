@@ -1,0 +1,140 @@
+syntax = "proto3";
+
+package daemon;
+option go_package = "github.com/sagernet/sing-box/daemon";
+
+message TailscaleStatusUpdate {
+  repeated TailscaleEndpointStatus endpoints = 1;
+}
+
+message TailscaleEndpointStatus {
+  string endpointTag = 1;
+  string backendState = 2;
+  string stateText = 3;
+  string authURL = 4;
+  string networkName = 5;
+  string magicDNSSuffix = 6;
+  TailscalePeer self = 7;
+  repeated TailscaleUserGroup userGroups = 8;
+  TailscalePeer exitNode = 9;
+  bool keyAuth = 10;
+  bool canShareFiles = 11;
+  int32 waitingFileCount = 12;
+  int32 receivingFileCount = 13;
+  int32 unreadFileCount = 14;
+}
+
+message TailscaleUserGroup {
+  int64 userID = 1;
+  string loginName = 2;
+  string displayName = 3;
+  string profilePicURL = 4;
+  repeated TailscalePeer peers = 5;
+}
+
+message TailscalePeer {
+  string hostName = 1;
+  string dnsName = 2;
+  string os = 3;
+  repeated string tailscaleIPs = 4;
+  bool online = 5;
+  bool exitNode = 6;
+  bool exitNodeOption = 7;
+  bool active = 8;
+  int64 rxBytes = 9;
+  int64 txBytes = 10;
+  int64 keyExpiry = 11;
+  string stableID = 12;
+  bool expired = 13;
+  repeated string sshHostKeys = 14;
+  bool shareeNode = 15;
+  int64 lastSeen = 16;
+  bool canReceiveFiles = 17;
+}
+
+message TailscalePingRequest {
+  string endpointTag = 1;
+  string peerIP = 2;
+}
+
+message TailscalePingResponse {
+  double latencyMs = 1;
+  bool isDirect = 2;
+  string endpoint = 3;
+  int32 derpRegionID = 4;
+  string derpRegionCode = 5;
+  string error = 6;
+  string peerRelay = 7;
+}
+
+message SetTailscaleExitNodeRequest {
+  string endpointTag = 1;
+  string stableID = 2;
+}
+
+message TailscaleLogoutRequest {
+  string endpointTag = 1;
+}
+
+message TailscaleSSHClientMessage {
+  oneof message {
+    TailscaleSSHStart start = 1;
+    TailscaleSSHInput input = 2;
+    TailscaleSSHResize resize = 3;
+  }
+}
+
+message TailscaleSSHStart {
+  string endpointTag = 1;
+  string peerAddress = 2;
+  string username = 3;
+  string terminalType = 4;
+  int32 columns = 5;
+  int32 rows = 6;
+  int32 widthPixels = 7;
+  int32 heightPixels = 8;
+  repeated string hostKeys = 9;
+  bool forward_agent = 10;
+}
+
+message TailscaleSSHInput {
+  bytes data = 1;
+}
+
+message TailscaleSSHResize {
+  int32 columns = 1;
+  int32 rows = 2;
+  int32 widthPixels = 3;
+  int32 heightPixels = 4;
+}
+
+message TailscaleSSHServerMessage {
+  oneof message {
+    TailscaleSSHAuthBanner authBanner = 1;
+    TailscaleSSHReady ready = 2;
+    TailscaleSSHOutput output = 3;
+    TailscaleSSHExit exit = 4;
+    TailscaleSSHError error = 5;
+  }
+}
+
+message TailscaleSSHAuthBanner {
+  string message = 1;
+}
+
+message TailscaleSSHReady {
+}
+
+message TailscaleSSHOutput {
+  bytes data = 1;
+}
+
+message TailscaleSSHExit {
+  int32 exitCode = 1;
+  string signal = 2;
+  string errorMessage = 3;
+}
+
+message TailscaleSSHError {
+  string message = 1;
+}

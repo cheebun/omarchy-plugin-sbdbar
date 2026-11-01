@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "id": "sbdbar",
+  "name": "sing-box dashboard bar widget",
+  "version": "1.0.0",
+  "author": "cheebun",
+  "license": "MIT",
+  "icon": "icon.svg",
+  "description": "A native Omarchy status bar widget and full-featured control panel for sing-box (specifically optimized for sing-box 1.14+ via its daemon gRPC API). Built following the official sing-box dashboard design language and Omarchy shell plugin standards.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "sing-box",
+    "description": "sing-box proxy controller, traffic monitor, and node selector",
+    "icon": "icon.svg",
+    "category": "Network",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "url": "http://127.0.0.1:9999",
+      "password": "",
+      "refreshIntervalSec": 2,
+      "showTraffic": true
+    },
+    "schema": [
+      {
+        "key": "url",
+        "type": "string",
+        "label": "API URL",
+        "defaultValue": "http://127.0.0.1:9999",
+        "description": "sing-box daemon gRPC API (services type \"api\"), e.g. http://127.0.0.1:9999"
+      },
+      {
+        "key": "password",
+        "type": "string",
+        "label": "API Password",
+        "defaultValue": "",
+        "description": "sing-box API secret / Bearer token"
+      },
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 1,
+        "max": 60,
+        "step": 1,
+        "defaultValue": 2
+      },
+      {
+        "key": "showTraffic",
+        "type": "boolean",
+        "label": "Display traffic in bar",
+        "defaultValue": true,
+        "description": "Show real-time upload and download speeds in the bar widget"
+      }
+    ]
+  }
+}

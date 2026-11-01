@@ -31,3 +31,13 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# sbdbar-agent build output (scripts/build_agent.sh)
+bin/
+
+# Python cache from scripts/split_proto.py
+__pycache__/
+*.pyc
+
+# macOS AppleDouble metadata
+._*
