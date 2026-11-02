@@ -13,7 +13,10 @@
 //
 //	select <group> <node> | urltest [group] | set-mode <mode> | close <id> | close-all
 //	get-config | save-config [--url URL] [--traffic bool] | set-traffic <bool>
-//	set-groups-view <card|list>
+//	set-pref <groupsView|ipProvider|stunServer> <value>
+//	ip [--provider ip.sb|ipwho.is|ipapi.is]   public egress IP over HTTP
+//	stun [--server host:port] [--outbound tag]  STUN test via sing-box; one line per phase
+//	                                             (QML always passes --outbound direct; flag kept for manual use)
 //
 // The daemon URL comes from --url, then BOX_API_URL, then the config file;
 // the secret from BOX_API_SECRET, then the config file.
@@ -34,7 +37,7 @@ func main() {
 	global := flag.NewFlagSet("sbdbar-agent", flag.ExitOnError)
 	flagURL := global.String("url", "", "sing-box daemon API URL")
 	global.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: sbdbar-agent [--url URL] <watch|connections|logs|select|urltest|set-mode|close|close-all|get-config|save-config|set-traffic|set-groups-view> [args]")
+		fmt.Fprintln(os.Stderr, "usage: sbdbar-agent [--url URL] <watch|connections|logs|select|urltest|set-mode|close|close-all|ip|stun|get-config|save-config|set-traffic|set-pref> [args]")
 	}
 	_ = global.Parse(os.Args[1:])
 	if global.NArg() == 0 {
@@ -73,14 +76,33 @@ func main() {
 		cfg := loadConfig()
 		cfg.ShowTraffic = len(args) == 0 || parseBool(args[0])
 		writeConfig(out, cfg)
-	case "set-groups-view":
-		if len(args) == 0 || (args[0] != "card" && args[0] != "list") {
-			out.emit(map[string]any{"success": false, "error": "usage: set-groups-view <card|list>"})
+	case "set-pref":
+		cfg := loadConfig()
+		if len(args) != 2 {
+			out.emit(map[string]any{"success": false, "error": "usage: set-pref <key> <value>"})
 			os.Exit(2)
 		}
-		cfg := loadConfig()
-		cfg.GroupsView = args[0]
+		if err := setPref(&cfg, args[0], args[1]); err != nil {
+			out.emit(map[string]any{"success": false, "error": err.Error()})
+			os.Exit(2)
+		}
 		writeConfig(out, cfg)
+	case "ip":
+		fs := flag.NewFlagSet("ip", flag.ExitOnError)
+		provider := fs.String("provider", "", "ip.sb, ipwho.is or ipapi.is (default: config)")
+		_ = fs.Parse(args)
+		if *provider == "" {
+			*provider = loadConfig().IPProvider
+		}
+		out.emit(runIP(*provider))
+	case "stun":
+		cfg := loadConfig()
+		fs := flag.NewFlagSet("stun", flag.ExitOnError)
+		server := fs.String("server", cfg.STUNServer, "STUN server host:port")
+		outbound := fs.String("outbound", "direct", "outbound tag (empty: default outbound)")
+		_ = fs.Parse(args)
+		daemonURL, secret := resolveEndpoint(*flagURL)
+		runSTUN(out, daemonURL, secret, *server, *outbound)
 	default:
 		global.Usage()
 		os.Exit(2)

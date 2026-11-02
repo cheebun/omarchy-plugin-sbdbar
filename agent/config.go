@@ -2,8 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const defaultURL = "http://127.0.0.1:9999"
@@ -14,6 +18,9 @@ type Config struct {
 	Password    string `json:"password"`
 	ShowTraffic bool   `json:"showTraffic"`
 	GroupsView  string `json:"groupsView"`
+	// IPProvider is one of ipProviders; STUNServer is host:port.
+	IPProvider string `json:"ipProvider"`
+	STUNServer string `json:"stunServer"`
 }
 
 func configPath() string {
@@ -28,7 +35,7 @@ func configPath() string {
 }
 
 func loadConfig() Config {
-	cfg := Config{URL: defaultURL, ShowTraffic: true, GroupsView: "card"}
+	cfg := Config{URL: defaultURL, ShowTraffic: true, GroupsView: "card", IPProvider: defaultIPProvider, STUNServer: defaultSTUNServer}
 	data, err := os.ReadFile(configPath())
 	if err != nil {
 		return cfg
@@ -50,8 +57,10 @@ func loadConfig() Config {
 	if v, ok := saved["showTraffic"].(bool); ok {
 		cfg.ShowTraffic = v
 	}
-	if v, ok := saved["groupsView"].(string); ok && (v == "card" || v == "list") {
-		cfg.GroupsView = v
+	for key := range prefKeys {
+		if v, ok := saved[key].(string); ok {
+			_ = setPref(&cfg, key, v)
+		}
 	}
 	return cfg
 }
@@ -107,4 +116,46 @@ func resolveEndpoint(flagURL string) (string, string) {
 		secret = cfg.Password
 	}
 	return u, secret
+}
+
+// prefKeys lists the UI preferences set-pref accepts, with their validators.
+var prefKeys = map[string]func(string) error{
+	"groupsView": func(v string) error {
+		if v != "card" && v != "list" {
+			return errors.New("groupsView must be card or list")
+		}
+		return nil
+	},
+	"ipProvider": func(v string) error {
+		if _, ok := ipProviders[v]; !ok {
+			return fmt.Errorf("ipProvider must be one of ip.sb, ipwho.is, ipapi.is")
+		}
+		return nil
+	},
+	"stunServer": func(v string) error {
+		if _, _, err := net.SplitHostPort(v); err != nil {
+			return fmt.Errorf("stunServer must be host:port: %v", err)
+		}
+		return nil
+	},
+}
+
+func setPref(cfg *Config, key, value string) error {
+	validate, ok := prefKeys[key]
+	if !ok {
+		return fmt.Errorf("unknown preference %q", key)
+	}
+	value = strings.TrimSpace(value)
+	if err := validate(value); err != nil {
+		return err
+	}
+	switch key {
+	case "groupsView":
+		cfg.GroupsView = value
+	case "ipProvider":
+		cfg.IPProvider = value
+	case "stunServer":
+		cfg.STUNServer = value
+	}
+	return nil
 }

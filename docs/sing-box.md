@@ -94,4 +94,6 @@ sing-box did not closed properly: close service: close service/api[0]: close tcp
 | 模式只有 `Rule` | 路由规则里没有 `clash_mode` 规则，见上文。 |
 | 分组里没有 `GLOBAL` | `GLOBAL` 是 Clash API 为兼容 Clash 面板拼出来的只读伪分组，gRPC 不返回它。全局模式实际走的是 `route.final` 指向的出站。 |
 | 节点没有 UDP 标记 | gRPC 的分组数据不包含节点是否支持 UDP，只有 Clash API 提供。 |
+| "Real IP" 显示 STUN 超时（`i/o timeout`） | 当前选择的 STUN 服务器经 `direct` 连不通，可以在设置里换一个，比如默认的 MiWiFi。 |
+| "Real IP" 显示 `outbound not found` | 配置里没有名为 `direct` 的出站，需要在 sing-box 配置中添加一个 `type: "direct"`、tag 为 `direct` 的出站。 |
 | agent 启动后立即退出，退出码 2 | 配置错误，例如用明文连接非回环地址，或者使用了 `https://`。 |

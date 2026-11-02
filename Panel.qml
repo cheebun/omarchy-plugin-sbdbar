@@ -96,6 +96,74 @@ Panel {
   // Short transitions so delay and selection updates ease in instead of jumping
   readonly property int transitionMs: 180
 
+  // One row of the Network card: label and hint on the left, value and detail
+  // on the right, with a refresh/test button
+  component NetRow: RowLayout {
+    id: netRow
+    property string label: ""
+    property string hint: ""
+    property string value: ""
+    property string detail: ""
+    property bool failed: false
+    property bool busy: false
+    property string actionIcon: ""
+    property string actionTip: ""
+    signal triggered()
+    spacing: Style.space(10)
+
+    Column {
+      Layout.preferredWidth: Style.space(130)
+      spacing: Style.space(2)
+      Text {
+        text: netRow.label
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption * 1.05
+        color: root.dim
+      }
+      Text {
+        text: netRow.hint
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption * 0.85
+        color: root.faint
+        width: Style.space(130)
+        elide: Text.ElideRight
+      }
+    }
+
+    Column {
+      Layout.fillWidth: true
+      Layout.minimumWidth: 0
+      spacing: Style.space(2)
+      Text {
+        width: parent.width
+        horizontalAlignment: Text.AlignRight
+        text: netRow.value
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption * 1.05
+        font.bold: true
+        color: root.foreground
+        elide: Text.ElideLeft
+      }
+      Text {
+        width: parent.width
+        horizontalAlignment: Text.AlignRight
+        text: netRow.detail
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption * 0.85
+        color: netRow.failed ? root.urgent : root.dim
+        elide: Text.ElideRight
+      }
+    }
+
+    Button {
+      radius: 0
+      iconText: netRow.actionIcon
+      tooltipText: netRow.actionTip
+      iconSpinning: netRow.busy
+      onClicked: netRow.triggered()
+    }
+  }
+
   function syncGroupsModel() {
     var groups = root.parentWidget ? (root.parentWidget.groupsData || []) : []
     var shape = root.groupsShape(groups)
@@ -135,6 +203,45 @@ Panel {
 
   onParentWidgetChanged: root.syncGroupsModel()
 
+  // "203.0.113.7:4000" -> "203.0.113.7", "[2001:db8::1]:4000" -> "2001:db8::1"
+  function hostOf(addr) {
+    var a = String(addr || "")
+    var m = a.match(/^\[(.*)\]:\d+$/)
+    if (m) return m[1]
+    var i = a.lastIndexOf(":")
+    return i > 0 && a.indexOf(":") === i ? a.slice(0, i) : a
+  }
+
+  function ipDetail(info) {
+    if (!info || !info.success) return info && info.error ? info.error : ""
+    var place = [info.city, info.country].filter(function(x) { return x }).join(", ")
+    var net = info.asn ? ("AS" + info.asn + (info.org ? " " + info.org : "")) : (info.org || "")
+    return [place, net].filter(function(x) { return x }).join(" · ")
+  }
+
+  // Classic NAT type from RFC 5780 mapping/filtering behavior
+  function natType(res) {
+    if (!res || !res.natTypeSupported) return ""
+    if (res.natMapping === "address-dependent" || res.natMapping === "address-and-port-dependent") return "Symmetric NAT"
+    if (res.natMapping !== "endpoint-independent") return ""
+    if (res.natFiltering === "endpoint-independent") return "Full Cone NAT"
+    if (res.natFiltering === "address-dependent") return "Restricted Cone NAT"
+    if (res.natFiltering === "address-and-port-dependent") return "Port Restricted Cone NAT"
+    return ""
+  }
+
+  function stunDetail(res, busy) {
+    if (!res || !res.type) return busy ? "Testing…" : "Not tested"
+    if (res.error) return res.error
+    if (!res.isFinal) return "Testing (" + res.phase + ")…"
+    var parts = []
+    var nat = root.natType(res)
+    if (nat) parts.push(nat)
+    if (res.latencyMs) parts.push(res.latencyMs + " ms")
+    if (res.server) parts.push(res.server)
+    return parts.join(" · ")
+  }
+
   function open() {
     if (parentWidget) {
       inputUrl = parentWidget.effectiveUrl || "http://127.0.0.1:9999"
@@ -142,6 +249,7 @@ Panel {
     }
     currentTab = "overview"
     root.controller.show()
+    if (parentWidget && Date.now() - parentWidget.publicIpFetchedAt > 30000) parentWidget.fetchPublicIp()
   }
 
   function close() {
@@ -984,6 +1092,69 @@ Panel {
                     }
                   }
                 }
+              }
+            }
+          }
+
+          // 6. Network Card: egress IP over HTTP and real IP over STUN
+          Rectangle {
+            id: networkCard
+            width: parent.width
+            implicitHeight: networkCol.implicitHeight + Style.space(24)
+            height: implicitHeight
+            color: root.tint(root.foreground, 0.05)
+            radius: 0
+            border.color: root.tint(root.foreground, 0.1)
+            border.width: 1
+
+            Column {
+              id: networkCol
+              x: Style.space(14)
+              y: Style.space(12)
+              width: parent.width - Style.space(28)
+              spacing: Style.space(10)
+
+              Row {
+                spacing: Style.space(6)
+                Text {
+                  text: "󰩠"
+                  font.family: Style.font.family
+                  font.pixelSize: Style.font.caption * 1.1
+                  color: root.dim
+                }
+                Text {
+                  text: "Network"
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption * 1.05
+                  font.bold: true
+                  color: root.foreground
+                }
+              }
+
+              NetRow {
+                width: parent.width
+                label: "Egress IP"
+                hint: "HTTP via " + (root.parentWidget ? root.parentWidget.ipProvider : "")
+                value: root.parentWidget && root.parentWidget.publicIp.success ? root.parentWidget.publicIp.ip : "—"
+                detail: root.parentWidget ? root.ipDetail(root.parentWidget.publicIp) : ""
+                failed: root.parentWidget ? (root.parentWidget.publicIp.success === false) : false
+                busy: root.parentWidget ? root.parentWidget.publicIpBusy : false
+                actionIcon: "󰑐"
+                actionTip: "Refresh egress IP"
+                onTriggered: if (root.parentWidget) root.parentWidget.fetchPublicIp()
+              }
+
+              NetRow {
+                width: parent.width
+                label: "Real IP"
+                hint: "STUN via direct"
+                value: root.parentWidget && root.parentWidget.stunResult.externalAddr ? root.hostOf(root.parentWidget.stunResult.externalAddr) : "—"
+                detail: root.parentWidget ? root.stunDetail(root.parentWidget.stunResult, root.parentWidget.stunBusy) : ""
+                failed: root.parentWidget ? Boolean(root.parentWidget.stunResult.error) : false
+                busy: root.parentWidget ? root.parentWidget.stunBusy : false
+                actionIcon: "󰓅"
+                actionTip: "Run STUN test"
+                onTriggered: if (root.parentWidget) root.parentWidget.runStun()
               }
             }
           }
@@ -1883,157 +2054,254 @@ Panel {
         // -----------------------------------------------------------
         // TAB 5: SETTINGS
         // -----------------------------------------------------------
-        Column {
+        // Settings outgrew the panel's height cap, so it scrolls like Groups and Connections
+        Flickable {
+          id: settingsFlickable
           width: parent.width
-          spacing: Style.space(10)
           visible: root.currentTab === "settings"
-
-          PanelSectionHeader {
-            text: "SING-BOX API CONFIGURATION"
-            foreground: root.foreground
-          }
-
-          Column {
-            width: parent.width
-            spacing: Style.space(4)
-
-            Text {
-              text: "Daemon API URL:"
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-              color: root.foreground
-            }
-
-            TextField {
-              Component.onCompleted: if (background) background.radius = 0
-              id: urlInput
-              width: parent.width
-              text: root.inputUrl
-              placeholderText: "http://127.0.0.1:9999"
-              onTextChanged: root.inputUrl = text
-            }
-          }
+          height: Math.min(settingsCol.implicitHeight, root.availableTabHeight + Style.space(60))
+          implicitHeight: height
+          contentWidth: width
+          contentHeight: settingsCol.implicitHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          flickableDirection: Flickable.VerticalFlick
+          interactive: contentHeight > height
+          ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
           Column {
-            width: parent.width
-            spacing: Style.space(4)
+            id: settingsCol
+            width: parent.width - (settingsFlickable.interactive ? Style.space(8) : 0)
+            spacing: Style.space(10)
 
-            Text {
-              text: "API Secret / Password:"
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-              color: root.foreground
+            PanelSectionHeader {
+              text: "SING-BOX API CONFIGURATION"
+              foreground: root.foreground
             }
 
-            RowLayout {
+            Column {
               width: parent.width
-              spacing: Style.space(6)
-
-              TextField {
-                Component.onCompleted: if (background) background.radius = 0
-                id: passInput
-                text: root.inputPassword
-                password: !root.showPassword
-                placeholderText: "Enter sing-box API secret"
-                Layout.fillWidth: true
-                onTextChanged: root.inputPassword = text
-              }
-
-              Button {
-                radius: 0
-                iconText: root.showPassword ? "󰈉" : "󰈈"
-                tooltipText: root.showPassword ? "Hide password" : "Show password"
-                onClicked: root.showPassword = !root.showPassword
-              }
-            }
-          }
-
-          RowLayout {
-            width: parent.width
-            spacing: Style.space(8)
-
-            Button {
-              radius: 0
-              text: "Save & Connect"
-              iconText: "󰆓"
-              selected: true
-              bordered: true
-              Layout.fillWidth: true
-              onClicked: root.saveConfig(root.inputUrl, root.inputPassword)
-            }
-          }
-
-          Text {
-            visible: Boolean(root.actionMessage)
-            text: root.actionMessage
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            color: root.actionIsError ? root.urgent : root.accent
-            horizontalAlignment: Text.AlignHCenter
-            width: parent.width
-          }
-
-          PanelSeparator {
-            width: parent.width
-            foreground: root.foreground
-          }
-
-          PanelSectionHeader {
-            text: "BAR DISPLAY"
-            foreground: root.foreground
-          }
-
-          Toggle {
-            radius: 0
-            width: parent.width
-            label: "Display Traffic in Bar"
-            description: "Show real-time upload and download speeds on the top bar"
-            foreground: root.foreground
-            accent: root.accent
-            fontFamily: root.fontFamily
-            checked: root.parentWidget ? root.parentWidget.showTraffic : root.showTrafficSetting
-            onClicked: {
-              var current = root.parentWidget ? root.parentWidget.showTraffic : root.showTrafficSetting
-              root.setTrafficDisplay(!current)
-            }
-          }
-
-          PanelSeparator {
-            width: parent.width
-            foreground: root.foreground
-          }
-
-          // Service info banner
-          BorderSurface {
-            width: parent.width
-            color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.05)
-            radius: 0
-            leftPadding: Style.space(10)
-            rightPadding: Style.space(10)
-            topPadding: Style.space(8)
-            bottomPadding: Style.space(8)
-
-            ColumnLayout {
-              anchors.fill: parent
-              spacing: Style.space(2)
+              spacing: Style.space(4)
 
               Text {
-                text: "sing-box 1.14 Integration"
+                text: "Daemon API URL:"
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
                 font.bold: true
                 color: root.foreground
               }
 
+              TextField {
+                Component.onCompleted: if (background) background.radius = 0
+                id: urlInput
+                width: parent.width
+                text: root.inputUrl
+                placeholderText: "http://127.0.0.1:9999"
+                onTextChanged: root.inputUrl = text
+              }
+            }
+
+            Column {
+              width: parent.width
+              spacing: Style.space(4)
+
               Text {
-                text: "Streams from the sing-box daemon gRPC API (services type \"api\", port 9999). Saved credentials persist to ~/.config/sbdbar/config.json."
+                text: "API Secret / Password:"
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.caption * 0.9
-                color: root.dim
-                wrapMode: Text.WordWrap
+                font.pixelSize: Style.font.caption
+                font.bold: true
+                color: root.foreground
+              }
+
+              RowLayout {
+                width: parent.width
+                spacing: Style.space(6)
+
+                TextField {
+                  Component.onCompleted: if (background) background.radius = 0
+                  id: passInput
+                  text: root.inputPassword
+                  password: !root.showPassword
+                  placeholderText: "Enter sing-box API secret"
+                  Layout.fillWidth: true
+                  onTextChanged: root.inputPassword = text
+                }
+
+                Button {
+                  radius: 0
+                  iconText: root.showPassword ? "󰈉" : "󰈈"
+                  tooltipText: root.showPassword ? "Hide password" : "Show password"
+                  onClicked: root.showPassword = !root.showPassword
+                }
+              }
+            }
+
+            RowLayout {
+              width: parent.width
+              spacing: Style.space(8)
+
+              Button {
+                radius: 0
+                text: "Save & Connect"
+                iconText: "󰆓"
+                selected: true
+                bordered: true
                 Layout.fillWidth: true
+                onClicked: root.saveConfig(root.inputUrl, root.inputPassword)
+              }
+            }
+
+            Text {
+              visible: Boolean(root.actionMessage)
+              text: root.actionMessage
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              color: root.actionIsError ? root.urgent : root.accent
+              horizontalAlignment: Text.AlignHCenter
+              width: parent.width
+            }
+
+            PanelSeparator {
+              width: parent.width
+              foreground: root.foreground
+            }
+
+            PanelSectionHeader {
+              text: "BAR DISPLAY"
+              foreground: root.foreground
+            }
+
+            Toggle {
+              radius: 0
+              width: parent.width
+              label: "Display Traffic in Bar"
+              description: "Show real-time upload and download speeds on the top bar"
+              foreground: root.foreground
+              accent: root.accent
+              fontFamily: root.fontFamily
+              checked: root.parentWidget ? root.parentWidget.showTraffic : root.showTrafficSetting
+              onClicked: {
+                var current = root.parentWidget ? root.parentWidget.showTraffic : root.showTrafficSetting
+                root.setTrafficDisplay(!current)
+              }
+            }
+
+            PanelSeparator {
+              width: parent.width
+              foreground: root.foreground
+            }
+
+            PanelSectionHeader {
+              text: "PUBLIC IP"
+              foreground: root.foreground
+            }
+
+            Column {
+              width: parent.width
+              spacing: Style.space(4)
+
+              Text {
+                text: "Egress IP lookup service:"
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+                color: root.foreground
+              }
+
+              RowLayout {
+                width: parent.width
+                spacing: Style.space(6)
+
+                Repeater {
+                  model: ["ip.sb", "ipwho.is", "ipapi.is"]
+
+                  Button {
+                    radius: 0
+                    text: modelData
+                    bordered: true
+                    selected: root.parentWidget && root.parentWidget.ipProvider === modelData
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    onClicked: if (root.parentWidget) root.parentWidget.setPref("ipProvider", modelData)
+                  }
+                }
+              }
+            }
+
+            Column {
+              width: parent.width
+              spacing: Style.space(4)
+
+              Text {
+                text: "STUN server:"
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+                color: root.foreground
+              }
+
+              RowLayout {
+                width: parent.width
+                spacing: Style.space(6)
+
+                // Built-in mainland China servers that answered over direct in testing; MiWiFi is the default
+                Repeater {
+                  model: [
+                    { "label": "MiWiFi", "value": "stun.miwifi.com:3478", "tip": "stun.miwifi.com:3478 (detects NAT type)" },
+                    { "label": "DouYu", "value": "stun.douyucdn.cn:18000", "tip": "stun.douyucdn.cn:18000 (detects NAT type)" },
+                    { "label": "bilibili", "value": "stun.chat.bilibili.com:3478", "tip": "stun.chat.bilibili.com:3478" },
+                    { "label": "Mango TV", "value": "stun.hitv.com:3478", "tip": "stun.hitv.com:3478" }
+                  ]
+
+                  Button {
+                    radius: 0
+                    text: modelData.label
+                    tooltipText: modelData.tip
+                    bordered: true
+                    selected: root.parentWidget && root.parentWidget.stunServer === modelData.value
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    onClicked: if (root.parentWidget) root.parentWidget.setPref("stunServer", modelData.value)
+                  }
+                }
+              }
+            }
+
+            PanelSeparator {
+              width: parent.width
+              foreground: root.foreground
+            }
+
+            // Service info banner
+            BorderSurface {
+              width: parent.width
+              color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.05)
+              radius: 0
+              leftPadding: Style.space(10)
+              rightPadding: Style.space(10)
+              topPadding: Style.space(8)
+              bottomPadding: Style.space(8)
+
+              ColumnLayout {
+                anchors.fill: parent
+                spacing: Style.space(2)
+
+                Text {
+                  text: "sing-box 1.14 Integration"
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                  color: root.foreground
+                }
+
+                Text {
+                  text: "Streams from the sing-box daemon gRPC API (services type \"api\", port 9999). Saved credentials persist to ~/.config/sbdbar/config.json."
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption * 0.9
+                  color: root.dim
+                  wrapMode: Text.WordWrap
+                  Layout.fillWidth: true
+                }
               }
             }
           }

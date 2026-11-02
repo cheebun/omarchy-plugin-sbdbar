@@ -23,6 +23,7 @@ Built following the official sing-box dashboard design language and Omarchy shel
 - **Overview Tab**:
   - Routing mode selector pills: `Rule` | `Direct` | `Global`.
   - Metric cards: upload and download speed with totals and live sparklines, memory and goroutines, inbound and outbound connection counts.
+  - Network card: the egress IP websites see (looked up over HTTP via ip.sb, ipwho.is or ipapi.is, with location and ASN), and your real public IP plus NAT type from a STUN test that sing-box runs through the `direct` outbound.
 - **Groups Tab**:
   - Collapsible group cards with type, node count and a per-group latency test; collapsed groups show a row of latency squares.
   - Card or list view for nodes, remembered across restarts, plus a "test all groups" button.
@@ -41,6 +42,7 @@ Built following the official sing-box dashboard design language and Omarchy shel
   - Configure the sing-box daemon API URL (default `http://127.0.0.1:9999`).
   - Configure API Secret / Bearer token with show/hide password toggle.
   - Toggle real-time traffic throughput display in the top bar.
+  - Choose the egress IP lookup service (ip.sb, ipwho.is, ipapi.is), the STUN server for the real IP test (MiWiFi, DouYu, bilibili, Mango TV; all tested from mainland China), and whether STUN goes through `direct` or the default outbound.
   - "Save & Connect" with local persistence to `~/.config/sbdbar/config.json`.
 - **Theme-aware styling**:
   - Every color derives from the current Omarchy theme (foreground, accent, urgent), so the panel follows theme switches; sing-box's own ANSI colors are kept in the logs.

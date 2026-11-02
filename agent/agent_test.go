@@ -48,7 +48,7 @@ func TestConfigRoundTripAndMigration(t *testing.T) {
 	path := filepath.Join(dir, "sbdbar", "config.json")
 	t.Setenv("SBDBAR_CONFIG", path)
 
-	if cfg := loadConfig(); cfg.URL != defaultURL || !cfg.ShowTraffic || cfg.Password != "" || cfg.GroupsView != "card" {
+	if cfg := loadConfig(); cfg.URL != defaultURL || !cfg.ShowTraffic || cfg.Password != "" || cfg.GroupsView != "card" || cfg.IPProvider != "ip.sb" || cfg.STUNServer != defaultSTUNServer {
 		t.Fatalf("defaults = %+v", cfg)
 	}
 

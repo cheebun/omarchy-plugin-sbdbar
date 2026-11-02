@@ -41,8 +41,17 @@ BarWidget {
 
   readonly property var configuredShowTraffic: setting("showTraffic", null)
   property bool showTraffic: configuredShowTraffic !== null ? Boolean(configuredShowTraffic) : true
-  // Groups tab layout ("card" or "list"), saved in the plugin config
+  // UI preferences saved in the plugin config through set-pref
   property string groupsView: "card"
+  property string ipProvider: "ip.sb"
+  property string stunServer: "stun.miwifi.com:3478"
+
+  // Public IP over HTTP (proxy egress) and the latest STUN result
+  property var publicIp: ({})
+  property bool publicIpBusy: false
+  property double publicIpFetchedAt: 0
+  property var stunResult: ({})
+  property bool stunBusy: false
 
   // sbdbar-agent is the only backend: it streams from the sing-box daemon
   // gRPC API and handles actions and config (see docs/grpc-agent.md).
@@ -69,14 +78,85 @@ BarWidget {
 
   function setGroupsView(view) {
     if (view !== "card" && view !== "list") return
-    root.groupsView = view
-    persistGroupsViewProc.command = [root.agentPath, "set-groups-view", view]
-    persistGroupsViewProc.running = false
-    persistGroupsViewProc.running = true
+    root.setPref("groupsView", view)
+  }
+
+  function setPref(key, value) {
+    if (["groupsView", "ipProvider", "stunServer"].indexOf(key) === -1) return
+    root[key] = value
+    persistPrefProc.command = [root.agentPath, "set-pref", key, value]
+    persistPrefProc.running = false
+    persistPrefProc.running = true
+    if (key === "ipProvider") root.fetchPublicIp()
   }
 
   Process {
-    id: persistGroupsViewProc
+    id: persistPrefProc
+  }
+
+  function fetchPublicIp() {
+    if (!root.agentAvailable) return
+    root.publicIpBusy = true
+    ipProc.running = false
+    ipProc.command = [root.agentPath, "ip", "--provider", root.ipProvider]
+    ipProc.running = true
+  }
+
+  Process {
+    id: ipProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        root.publicIpBusy = false
+        root.publicIpFetchedAt = Date.now()
+        try {
+          root.publicIp = JSON.parse(String(text || "").trim())
+        } catch (e) {
+          root.publicIp = { "success": false, "error": "Invalid response" }
+        }
+      }
+    }
+  }
+
+  function runStun() {
+    if (!root.agentAvailable || root.stunBusy) return
+    root.stunBusy = true
+    root.stunResult = {}
+    stunProc.environment = root.procEnv()
+    stunProc.command = [root.agentPath, "stun", "--server", root.stunServer, "--outbound", "direct"]
+    stunProc.running = true
+  }
+
+  Process {
+    id: stunProc
+    stdout: SplitParser {
+      onRead: function(line) {
+        try {
+          root.stunResult = JSON.parse(line)
+        } catch (e) {}
+      }
+    }
+    onExited: root.stunBusy = false
+  }
+
+  // Auto-refresh Real IP: run once when no result yet, then every 5 minutes
+  Timer {
+    id: stunAutoTimer
+    interval: 300000
+    repeat: true
+    running: root.agentAvailable
+    triggeredOnStart: false
+    onTriggered: root.runStun()
+  }
+
+  // The egress IP changes when the selected node or mode does; refetch once it settles
+  onActiveNodeChanged: if (root.publicIpFetchedAt > 0) ipRefetchDebounce.restart()
+  onCurrentModeChanged: if (root.publicIpFetchedAt > 0) ipRefetchDebounce.restart()
+
+  Timer {
+    id: ipRefetchDebounce
+    interval: 2500
+    onTriggered: root.fetchPublicIp()
   }
 
   Process {
@@ -108,8 +188,11 @@ BarWidget {
             root.showTraffic = Boolean(cfg.showTraffic)
           }
           if (cfg.groupsView === "card" || cfg.groupsView === "list") root.groupsView = cfg.groupsView
+          if (cfg.ipProvider) root.ipProvider = cfg.ipProvider
+          if (cfg.stunServer) root.stunServer = cfg.stunServer
         } catch (e) {}
         root.restartAgent()
+        if (Object.keys(root.stunResult).length === 0) root.runStun()
       }
     }
   }

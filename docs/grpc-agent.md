@@ -60,7 +60,15 @@ secret 的取值顺序：环境变量 `BOX_API_SECRET`，然后配置文件。
 - `get-config`
 - `save-config [--url URL] [--traffic bool]`：secret 通过环境变量传入，不出现在 ps 里。
 - `set-traffic <bool>`
-- `set-groups-view <card|list>`：保存分组页的显示方式（卡片或列表）。
+- `set-pref <key> <value>`：保存界面偏好，每个 key 都会做校验。
+  - `groupsView`：`card` 或 `list`。
+  - `ipProvider`：`ip.sb`、`ipwho.is` 或 `ipapi.is`。
+  - `stunServer`：`host:port`，默认 `stun.miwifi.com:3478`。
+- `ip [--provider ...]`：通过 HTTP 查询出口 IP，并把三家服务的返回统一成 `{success, provider, ip, country, countryCode, region, city, asn, org}`。
+  - 请求走系统网络。在 TUN 模式下，拿到的是经过 sing-box 路由后的出口地址。
+- `stun [--server host:port] [--outbound tag]`：调用 daemon 的 `StartSTUNTest`。QML 侧固定传 `--outbound direct`（经实测验证 outbound 确实影响出口地址，direct 测真实公网 IP），不再提供"走代理出口"的可配置项；flag 本身保留供手动调用。
+  - 按阶段逐行输出 `{type:"stun", phase, externalAddr, latencyMs, natMapping, natFiltering, natTypeSupported, isFinal, error, server}`。
+  - 只请求指定的那一个服务器，失败就把错误作为最后一行输出，不自动换别的服务器。
 
 ## 实测结论（sing-box 1.14.3）
 
@@ -75,6 +83,22 @@ secret 的取值顺序：环境变量 `BOX_API_SECRET`，然后配置文件。
   - `message` 里自带 sing-box 的 ANSI 颜色码，原样放进 `raw`，Panel 用 `ansiToHtml` 渲染。
   - 去掉颜色码和 `LEVEL[seq]` 前缀后的文本放进 `message`，用于搜索。
   - 第一批 `reset` 会回放 daemon 的整个缓冲（实测 2342 条），agent 只保留最后 300 条。
+- **STUN**：
+  - `outboundTag` 留空时用默认出站（`route.final`），返回的是代理的 UDP 出口；指定 `direct` 时返回本机宽带的真实公网 IP。
+  - `natMapping` 和 `natFiltering` 的取值：0 = unknown，1 = endpoint-independent，2 = address-dependent，3 = address-and-port-dependent。
+  - 只有支持 RFC 5780 的服务器（例如 `stun.miwifi.com`）能测出 NAT 类型。
+  - 设置页内置的服务器都在国内经 `direct` 实测连通：
+
+    | 服务器 | 延迟 | 能否测 NAT 类型 |
+    | --- | --- | --- |
+    | `stun.miwifi.com:3478`（默认） | 约 25ms | 能 |
+    | `stun.douyucdn.cn:18000` | 约 30ms | 能 |
+    | `stun.chat.bilibili.com:3478` | 约 30ms | 不能 |
+    | `stun.hitv.com:3478` | 约 10ms | 不能 |
+
+  - 以下服务器在实测中不可用，所以没有内置：
+    - 超时：sing-box 默认的 `stun.voipgate.com`，以及 `stun.qq.com`、`stun.yy.com`、`stun.cdnbye.com`。
+    - 域名不存在：`stun.netease.im`、`stun.163.com`。
 - **进程生命周期**：
   - 父进程被 SIGKILL 后，agent 在 0.5 秒内退出。机制是 `PR_SET_PDEATHSIG`，另外每 2 秒轮询一次 ppid 兜底。
   - stdout 关闭时也会退出。
